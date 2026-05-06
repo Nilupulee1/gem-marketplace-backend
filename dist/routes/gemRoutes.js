@@ -22,7 +22,10 @@ router.get('/approved', auth_1.authenticate, gemController_1.getApprovedGems);
 // Get specific gem by ID
 router.get('/:id', auth_1.authenticate, gemController_1.getGemById);
 // Update gem
-router.patch('/:id', auth_1.authenticate, (0, roleAuth_1.requireRole)(types_1.UserRole.SELLER), gemController_1.updateGem);
+router.patch('/:id', auth_1.authenticate, (0, roleAuth_1.requireRole)(types_1.UserRole.SELLER), upload_1.upload.fields([
+    { name: 'images', maxCount: 5 },
+    { name: 'certificate', maxCount: 1 }
+]), gemController_1.updateGem);
 // Delete gem
 router.delete('/:id', auth_1.authenticate, (0, roleAuth_1.requireRole)(types_1.UserRole.SELLER), gemController_1.deleteGem);
 exports.default = router;

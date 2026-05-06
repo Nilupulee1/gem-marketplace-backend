@@ -10,17 +10,21 @@ const types_1 = require("../types");
 const register = async (req, res) => {
     try {
         const { name, email, password, role } = req.body;
+        const normalizedEmail = email?.trim().toLowerCase();
+        if (!normalizedEmail) {
+            return res.status(400).json({ message: 'Email is required' });
+        }
         // Validate role
         if (!Object.values(types_1.UserRole).includes(role)) {
             return res.status(400).json({ message: 'Invalid role' });
         }
         // Check if user exists
-        const existingUser = await User_1.default.findOne({ email });
+        const existingUser = await User_1.default.findOne({ email: normalizedEmail });
         if (existingUser) {
             return res.status(400).json({ message: 'Email already registered' });
         }
         // Create user
-        const user = new User_1.default({ name, email, password, role });
+        const user = new User_1.default({ name, email: normalizedEmail, password, role });
         await user.save();
         // Generate token
         const payload = { userId: user._id.toString(), role: user.role };
@@ -44,8 +48,12 @@ exports.register = register;
 const login = async (req, res) => {
     try {
         const { email, password } = req.body;
+        const normalizedEmail = email?.trim().toLowerCase();
+        if (!normalizedEmail || !password) {
+            return res.status(400).json({ message: 'Email and password are required' });
+        }
         // Find user
-        const user = await User_1.default.findOne({ email });
+        const user = await User_1.default.findOne({ email: normalizedEmail });
         if (!user) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }

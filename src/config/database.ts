@@ -21,6 +21,7 @@ export const connectDatabase = async () => {
   } catch (error) {
     const mongooseError = error as Error & { name?: string };
     const message = mongooseError.message || '';
+    const isSrvUri = mongoUri.startsWith('mongodb+srv://');
 
     console.error('❌ MongoDB connection error:', message);
     console.error(`🔗 URI: ${redactMongoUri(mongoUri)}`);
@@ -36,8 +37,16 @@ export const connectDatabase = async () => {
       console.error('🛠️ Atlas troubleshooting:');
       console.error('  1) In Atlas, allow your current IP in Network Access.');
       console.error('  2) Ensure the Atlas cluster is Running (not paused).');
-      console.error('  3) Use the Atlas mongodb+srv connection string in MONGODB_URI.');
-      console.error('  4) If your network blocks 27017, try a different network/hotspot.');
+      console.error('  3) Ensure the Atlas DB user exists and password is correct.');
+      console.error('  4) Ensure the DB user has readWrite access to gem-marketplace.');
+
+      if (isSrvUri) {
+        console.error('  5) If DNS blocks SRV lookups, use the Atlas non-SRV mongodb:// host list URI.');
+      } else {
+        console.error('  5) Verify all shard hosts and replicaSet in your mongodb:// URI match Atlas exactly.');
+      }
+
+      console.error('  6) If your network blocks 27017, try a different network/hotspot.');
     }
 
     process.exit(1);

@@ -11,13 +11,17 @@ const storage = new multer_storage_cloudinary_1.CloudinaryStorage({
     cloudinary: cloudinary_1.default,
     params: async (req, file) => {
         const isImage = file.mimetype.startsWith('image/');
-        return {
+        const isPdf = file.mimetype === 'application/pdf';
+        const params = {
             folder: 'gem_marketplace',
-            allowed_formats: ['jpg', 'jpeg', 'png', 'pdf'],
-            transformation: isImage
-                ? [{ width: 1000, height: 1000, crop: 'limit' }]
-                : undefined,
+            resource_type: isPdf ? 'raw' : 'image',
+            allowed_formats: isPdf ? ['pdf'] : ['jpg', 'jpeg', 'png'],
         };
+        // Only add transformation for images
+        if (isImage) {
+            params.transformation = [{ width: 1000, height: 1000, crop: 'limit' }];
+        }
+        return params;
     },
 });
 const fileFilter = (req, file, cb) => {

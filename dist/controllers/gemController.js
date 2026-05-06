@@ -4,8 +4,57 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteGem = exports.updateGem = exports.getGemById = exports.getApprovedGems = exports.getMyGems = exports.createGem = void 0;
+const cloudinary_1 = __importDefault(require("../config/cloudinary"));
 const Gem_1 = __importDefault(require("../models/Gem"));
 const types_1 = require("../types");
+const normalizePdfUrl = (url) => {
+    if (!url)
+        return url;
+    const isPdfUrl = /\.pdf(?:$|\?)/i.test(url);
+    if (isPdfUrl && url.includes('/image/upload/')) {
+        return url.replace('/image/upload/', '/raw/upload/');
+    }
+    return url;
+};
+const withNormalizedCertificateUrl = (gem) => {
+    if (!gem?.certificate?.url)
+        return gem;
+    return {
+        ...gem,
+        certificate: {
+            ...gem.certificate,
+            url: normalizePdfUrl(gem.certificate.url),
+        },
+    };
+};
+const extractCloudinaryPublicId = (url) => {
+    try {
+        const assetUrl = new URL(url);
+        const uploadIndex = assetUrl.pathname.indexOf('/upload/');
+        if (uploadIndex === -1)
+            return null;
+        const assetPath = assetUrl.pathname.slice(uploadIndex + '/upload/'.length).replace(/^v\d+\//, '');
+        const publicId = assetPath.replace(/\.[^/.]+$/, '');
+        return publicId ? decodeURIComponent(publicId) : null;
+    }
+    catch {
+        return null;
+    }
+};
+const deleteCloudinaryAsset = async (url) => {
+    if (!url)
+        return;
+    const publicId = extractCloudinaryPublicId(url);
+    if (!publicId)
+        return;
+    const resourceType = url.includes('/raw/upload/') ? 'raw' : 'image';
+    try {
+        await cloudinary_1.default.uploader.destroy(publicId, { resource_type: resourceType });
+    }
+    catch (error) {
+        console.warn('⚠️  Failed to delete old certificate from Cloudinary:', error);
+    }
+};
 const createGem = async (req, res) => {
     try {
         console.log('📦 Received gem creation request');
@@ -24,7 +73,7 @@ const createGem = async (req, res) => {
         console.log('🖼️  Images uploaded:', gemImages.map(img => img.path));
         console.log('📄 Certificate uploaded:', certificateFile.path);
         const imageUrls = gemImages.map(img => img.path);
-        const certificateUrl = certificateFile.path;
+        const certificateUrl = normalizePdfUrl(certificateFile.path);
         const gemData = {
             seller: req.user.userId,
             type: req.body.type,
@@ -48,7 +97,7 @@ const createGem = async (req, res) => {
         console.log('✅ Gem created successfully:', gem._id);
         res.status(201).json({
             message: 'Gem uploaded successfully and pending approval',
-            gem
+            gem: withNormalizedCertificateUrl(gem.toObject())
         });
     }
     catch (error) {
@@ -68,7 +117,9 @@ const getMyGems = async (req, res) => {
         const gems = await Gem_1.default.find({ seller: req.user.userId })
             .sort({ createdAt: -1 });
         console.log('✅ Found gems:', gems.length);
-        res.json({ gems });
+        res.json({
+            gems: gems.map((gem) => withNormalizedCertificateUrl(gem.toObject()))
+        });
     }
     catch (error) {
         console.error('❌ Error fetching gems:', error);
@@ -97,7 +148,9 @@ const getApprovedGems = async (req, res) => {
         const gems = await Gem_1.default.find(filter)
             .populate('seller', 'name email')
             .sort({ createdAt: -1 });
-        res.json({ gems });
+        res.json({
+            gems: gems.map((gem) => withNormalizedCertificateUrl(gem.toObject()))
+        });
     }
     catch (error) {
         console.error('❌ Error fetching approved gems:', error);
@@ -115,7 +168,9 @@ const getGemById = async (req, res) => {
         if (!gem) {
             return res.status(404).json({ message: 'Gem not found' });
         }
-        res.json({ gem });
+        res.json({
+            gem: withNormalizedCertificateUrl(gem.toObject())
+        });
     }
     catch (error) {
         console.error('❌ Error fetching gem:', error);
@@ -136,10 +191,8 @@ const updateGem = async (req, res) => {
         if (gem.seller.toString() !== req.user.userId) {
             return res.status(403).json({ message: 'You can only update your own gems' });
         }
-        // Only allow updates to pending or rejected gems
-        if (gem.status === types_1.GemStatus.APPROVED) {
-            return res.status(400).json({ message: 'Cannot update approved gems' });
-        }
+        const files = req.files;
+        const previousCertificateUrl = gem.certificate?.url;
         const allowedUpdates = ['type', 'carat', 'cut', 'clarity', 'color', 'origin', 'description'];
         const updates = Object.keys(req.body);
         updates.forEach(update => {
@@ -147,14 +200,30 @@ const updateGem = async (req, res) => {
                 gem[update] = req.body[update];
             }
         });
+        if (req.body.certificateAuthority !== undefined) {
+            gem.certificate.authority = req.body.certificateAuthority;
+        }
+        if (req.body.certificateNumber !== undefined) {
+            gem.certificate.certificateNumber = req.body.certificateNumber;
+        }
+        if (files?.images?.length) {
+            gem.images = files.images.map((imageFile) => imageFile.path);
+        }
+        if (files?.certificate?.length) {
+            const certificateFile = files.certificate[0];
+            gem.certificate.url = normalizePdfUrl(certificateFile.path);
+        }
         // Reset status to pending after update
         gem.status = types_1.GemStatus.PENDING;
         gem.adminFeedback = undefined;
         await gem.save();
+        if (files?.certificate?.length && previousCertificateUrl && previousCertificateUrl !== gem.certificate.url) {
+            await deleteCloudinaryAsset(previousCertificateUrl);
+        }
         console.log('✅ Gem updated:', gem._id);
         res.json({
             message: 'Gem updated successfully',
-            gem
+            gem: withNormalizedCertificateUrl(gem.toObject())
         });
     }
     catch (error) {

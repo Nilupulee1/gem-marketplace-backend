@@ -36,7 +36,16 @@ router.get('/approved', authenticate, getApprovedGems);
 router.get('/:id', authenticate, getGemById);
 
 // Update gem
-router.patch('/:id', authenticate, requireRole(UserRole.SELLER), updateGem);
+router.patch(
+  '/:id',
+  authenticate,
+  requireRole(UserRole.SELLER),
+  upload.fields([
+    { name: 'images', maxCount: 5 },
+    { name: 'certificate', maxCount: 1 }
+  ]),
+  updateGem
+);
 
 // Delete gem
 router.delete('/:id', authenticate, requireRole(UserRole.SELLER), deleteGem);
