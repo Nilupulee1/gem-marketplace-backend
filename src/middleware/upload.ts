@@ -6,14 +6,20 @@ const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
     const isImage = file.mimetype.startsWith('image/');
+    const isPdf = file.mimetype === 'application/pdf';
 
-    return {
+    const params: any = {
       folder: 'gem_marketplace',
-      allowed_formats: ['jpg', 'jpeg', 'png', 'pdf'],
-      transformation: isImage
-        ? [{ width: 1000, height: 1000, crop: 'limit' }]
-        : undefined,
-    } as any;
+      resource_type: isPdf ? 'raw' : 'image',
+      allowed_formats: isPdf ? ['pdf'] : ['jpg', 'jpeg', 'png'],
+    };
+
+    // Only add transformation for images
+    if (isImage) {
+      params.transformation = [{ width: 1000, height: 1000, crop: 'limit' }];
+    }
+
+    return params;
   },
 });
 

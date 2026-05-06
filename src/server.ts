@@ -6,6 +6,7 @@ import authRoutes from './routes/authRoutes';
 import gemRoutes from './routes/gemRoutes';
 import auctionRoutes from './routes/auctionRoutes';
 import adminRoutes from './routes/adminRoutes';
+import buyerRoutes from './routes/buyerRoutes';
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/gems', gemRoutes);
 app.use('/api/auctions', auctionRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/buyer', buyerRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

@@ -45,6 +45,9 @@ const gemSchema = new Schema<IGem>({
       type: String,
       required: true
     },
+    mimeType: {
+      type: String
+    },
     authority: {
       type: String,
       required: true

@@ -42,6 +42,8 @@ export interface IGem extends Document {
   images: string[];
   certificate: {
     url: string;
+    mimeType?: string;
+    accessUrl?: string;
     authority: string;
     certificateNumber: string;
   };
